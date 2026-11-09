@@ -1,6 +1,9 @@
 """
 Operation Ward Zero - Backend (FastAPI)
 Sense -> Understand -> Predict -> Alert -> Respond
+
+Run:  uvicorn main:app --host 0.0.0.0 --port 8000
+Open: http://localhost:8000
 """
 import asyncio
 import json
@@ -8,6 +11,7 @@ import logging
 import os
 import time
 import uuid
+import random
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -53,7 +57,7 @@ class State:
     alerts = {}
     last_alert_ts = {}
     retry_buffer = deque(maxlen=BUFFER_MAX)
-    current_notes = "" # Caregiver Notes store karne ke liye
+    current_notes = ""
 
 S = State()
 
@@ -202,7 +206,7 @@ async def flush_loop():
         except Exception as e:
             log.error("flush_loop error: %s", e)
 
-# ----------------------------- GROQ AI ------------------------
+# ----------------------------- GROQ ADVICE ----------------------------------
 def _groq_opts(max_out: int) -> dict:
     o = {"model": GROQ_MODEL, "temperature": 0.4, "max_completion_tokens": max_out + 700}
     if "gpt-oss" in GROQ_MODEL:
@@ -224,10 +228,7 @@ def fallback_advice(reasons: list) -> str:
 
 async def groq_advice(v: dict, risk: float, reasons: list) -> str:
     if not GROQ_API_KEY: return fallback_advice(reasons)
-    
-    # NAYA: Caregiver notes ko AI prompt me bhejo
     notes_context = f"Caregiver Notes: {S.current_notes}." if S.current_notes else "No caregiver notes."
-    
     prompt = (f"Home patient vitals: HR {v['hr']} bpm, SpO2 {v['spo2']}%, BP {v['sys']}/{v['dia']} mmHg, "
               f"Temp {v['temp']} C. AI risk score {risk:.2f}. Flags: {[r['code'] for r in reasons]}. {notes_context} "
               "Give EXACTLY 2 short bullet points (start each with '- ') of highly actionable, "
@@ -268,9 +269,7 @@ async def chat_reply(text: str, history: list, lang: str) -> str:
     if not GROQ_API_KEY:
         return fallback_chat(v, reasons) + "\n[GROQ_API_KEY not loaded]"
     langname = {"hi": "Hindi", "hinglish": "Hinglish"}.get(lang, "English")
-    
     notes_context = f"Caregiver notes: {S.current_notes}." if S.current_notes else ""
-    
     system = ("You are Ward Zero AI, a calm home-healthcare assistant for a family caregiver. "
               "Never diagnose and never give medication doses. Be concise (max 80 words). "
               f"Reply in {langname}. Live patient data: {_vitals_text(v)}. {notes_context} "
@@ -298,12 +297,10 @@ async def handle_chat(ws: WebSocket, history: list, text: str, lang: str):
         await asyncio.wait_for(ws.send_text(json.dumps({"type": "chat", "text": reply})), timeout=3)
     except Exception as e:
         log.info("chat send failed: %s", e)
-
-# ----------------------------- PIPELINE -------------------------------------
+        # ----------------------------- PIPELINE -------------------------------------
 async def create_alert(pid: str, v: dict, risk: float, reasons: list):
     try:
         advice = await groq_advice(v, risk, reasons)
-        # NAYA: Response time aur Caregiver notes backend me save karo
         alert = {"id": str(uuid.uuid4()), "patient_id": pid, "risk": round(risk, 3),
                  "reasons": reasons, "advice": advice, "acknowledged": False,
                  "caregiver_notes": S.current_notes, "ts": datetime.now(timezone.utc).isoformat()}
@@ -362,16 +359,65 @@ def start_mqtt() -> mqtt.Client:
         log.error("MQTT start failed: %s", e)
     return client
 
+# ----------------------------- INTERNAL SIMULATOR (Tumhara simulator.py logic) ---
+NORMAL = dict(hr=76, spo2=97.5, sys=118, dia=76, temp=36.8)
+CRITICAL = dict(hr=138, spo2=86.5, sys=172, dia=104, temp=39.1)
+
+def _sim_lerp(a, b, t):
+    return {k: a[k] + (b[k] - a[k]) * t for k in a}
+
+def _sim_phase(elapsed):
+    t = elapsed % 105
+    if t < 45:  return "NORMAL", 0.0
+    if t < 60:  return "DETERIORATING", (t - 45) / 15
+    if t < 90:  return "CRITICAL", 1.0
+    return "RECOVERING", 1 - (t - 90) / 15
+
+def _sim_reading(blend):
+    base = _sim_lerp(NORMAL, CRITICAL, blend)
+    return {
+        "hr": round(base["hr"] + random.gauss(0, 2 + 3 * blend)),
+        "spo2": round(min(100, base["spo2"] + random.gauss(0, 0.4 + 0.6 * blend)), 1),
+        "sys": round(base["sys"] + random.gauss(0, 3 + 4 * blend)),
+        "dia": round(base["dia"] + random.gauss(0, 2 + 3 * blend)),
+        "temp": round(base["temp"] + random.gauss(0, 0.1), 1),
+        "ts": time.time(),
+    }
+
+async def internal_simulator():
+    log.info("Internal Simulator Started (Generating Data...).")
+    start = time.time()
+    while True:
+        try:
+            elapsed = time.time() - start
+            label, blend = _sim_phase(elapsed)
+            data = _sim_reading(blend)
+            
+            # Bypass MQTT, direct process call
+            await process("wardzero/bed01/vitals", json.dumps(data).encode())
+            
+            log.info(f"[SIM {label:<14}] HR {data['hr']:>3} SpO2 {data['spo2']:>5} BP {data['sys']}/{data['dia']}")
+            await asyncio.sleep(5)
+        except Exception as e:
+            log.error(f"Internal Simulator Error: {e}")
+            await asyncio.sleep(5)
+
 # ----------------------------- APP ------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     S.loop = asyncio.get_running_loop()
     _init_db()
     S.db_connected = S.db_client is not None
+    
     client = start_mqtt()
-    task = asyncio.create_task(flush_loop())
+    
+    task_flush = asyncio.create_task(flush_loop())
+    task_sim = asyncio.create_task(internal_simulator())  # Auto-start fake data generator
+    
     yield
-    task.cancel()
+    
+    task_flush.cancel()
+    task_sim.cancel()
     try:
         client.loop_stop(); client.disconnect()
     except Exception:
@@ -400,25 +446,18 @@ async def ws_endpoint(ws: WebSocket):
             if msg.get("type") == "ack" and msg.get("id") in S.alerts:
                 a = S.alerts[msg["id"]]
                 a["acknowledged"] = True
-                
-                # NAYA: Response time calculate karo
                 sent_time = datetime.fromisoformat(a["ts"].replace('Z', '+00:00'))
                 ack_time = datetime.now(timezone.utc)
                 response_sec = int((ack_time - sent_time).total_seconds())
                 a["response_time"] = response_sec
-                
                 await manager.broadcast({"type": "ack", "id": a["id"], "response_time": response_sec})
-                
                 asyncio.create_task(persist("alerts", {
                     "id": a["id"], 
                     "set": {"acknowledged": True, "response_time": response_sec}
                 }, "update"))
-                
             elif msg.get("type") == "note":
-                # NAYA: Caregiver note receive karo
                 S.current_notes = str(msg.get("text", ""))[:200]
                 log.info(f"Caregiver Note: {S.current_notes}")
-                
             elif msg.get("type") == "chat" and str(msg.get("text", "")).strip():
                 asyncio.create_task(handle_chat(ws, chat_hist, str(msg["text"]), str(msg.get("lang", "en"))))
             elif msg.get("type") == "ping":
