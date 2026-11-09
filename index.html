@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WARD ZERO // Holographic Command Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* --- NEW COLOR PALETTE: MEDICAL GREEN, BLACK, RED --- */
+:root{--bg:#050505;--c:#00ff88;--p:#00ff88;--r:#ff003c;--g:#00ff88;--a:var(--c)}
+body.danger{--a:var(--r)}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:#d6faff;font-family:'Rajdhani',system-ui,sans-serif;font-size:17px}
+.orb{font-family:'Orbitron',sans-serif}.mono{font-family:'Share Tech Mono',monospace}
+/* ---------- backdrop: glowing grid floor + scanlines ---------- */
+body::before{content:"";position:fixed;inset:0;z-index:0;background:
+ radial-gradient(ellipse at 50% 0%,rgba(0,255,136,.15),transparent 55%),radial-gradient(ellipse at 50% 100%,rgba(0,255,136,.1),transparent 55%),
+ linear-gradient(rgba(0,255,136,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.06) 1px,transparent 1px);
+ background-size:100% 100%,100% 100%,52px 52px,52px 52px;animation:grid 8s linear infinite;mask-image:radial-gradient(circle at 50% 50%,#000 35%,transparent 92%)}
+@keyframes grid{to{background-position:0 0,0 0,0 52px,52px 0}}
+body::after{content:"";position:fixed;inset:0;z-index:50;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);opacity:.5}
+/* ---------- holographic glass ---------- */
+.holo{position:relative;background:linear-gradient(135deg,rgba(0,255,136,.07),rgba(0,0,0,.5));backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);
+ border:1px solid rgba(0,255,136,.3);border-radius:14px;box-shadow:0 0 26px rgba(0,255,136,.1),inset 0 0 34px rgba(0,255,136,.03);transition:border-color .4s,box-shadow .4s}
+.holo::before,.holo::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--c);filter:drop-shadow(0 0 5px var(--c));pointer-events:none}
+.holo::before{top:-2px;left:-2px;border-right:0;border-bottom:0;border-top-left-radius:14px}
+.holo::after{bottom:-2px;right:-2px;border-left:0;border-top:0;border-bottom-right-radius:14px}
+.float{animation:float 6s ease-in-out infinite}.float.d2{animation-delay:-2s}.float.d3{animation-delay:-4s}
+@keyframes float{50%{translate:0 -8px}}
+/* ---------- chrome ---------- */
+#top{position:fixed;top:10px;left:14px;right:14px;height:54px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:12px}
+#bot{position:fixed;bottom:46px;left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:16px;padding:8px 16px}
+#foot{position:fixed;left:0;right:0;bottom:0;height:34px;z-index:30;display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;font-size:13px;color:#7aa9b3;background:rgba(5,5,5,.7);backdrop-filter:blur(8px);border-top:1px solid rgba(0,255,136,.18)}
+#foot b{color:var(--c);letter-spacing:.08em}#foot a{display:inline-flex;gap:6px;align-items:center;color:#7aa9b3;text-decoration:none;transition:.25s}
+#foot a:hover,#foot a:focus-visible{color:var(--c);text-shadow:0 0 10px var(--c);outline:none}#foot svg{width:14px;height:14px;fill:currentColor}
+.nav{border:1px solid var(--c);background:rgba(0,255,136,.07);color:var(--c);padding:7px 18px;border-radius:8px;font-family:Orbitron;font-size:11px;letter-spacing:.12em;cursor:pointer;display:flex;gap:8px;align-items:center;transition:.25s}
+.nav svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:3;filter:drop-shadow(0 0 4px var(--c))}
+.nav:hover:not(:disabled){background:rgba(0,255,136,.22);box-shadow:0 0 22px var(--c)}.nav:disabled{opacity:.28;cursor:default}
+.dot{width:9px;height:9px;border-radius:2px;background:#16323a;cursor:pointer;transform:rotate(45deg);transition:.3s}.dot.on{background:var(--a);box-shadow:0 0 12px var(--a);width:24px;transform:none;border-radius:4px}
+select{background:#050a0c;color:var(--c);border:1px solid rgba(0,255,136,.5);border-radius:8px;padding:5px 8px;font:600 14px Rajdhani;outline:none}
+.led{width:9px;height:9px;border-radius:50%;background:var(--r);box-shadow:0 0 9px var(--r);display:inline-block}.led.ok{background:var(--g);box-shadow:0 0 9px var(--g);animation:blink 2s infinite}
+@keyframes blink{50%{opacity:.35}}
+#bell{position:relative;cursor:pointer;border:1px solid rgba(0,255,136,.45);border-radius:8px;padding:5px 9px;background:none;color:var(--c)}
+#bell.hot{border-color:var(--r);color:var(--r);animation:flash 1s infinite}
+#bellN{position:absolute;top:-7px;right:-7px;background:var(--r);color:#fff;font:700 11px Orbitron;border-radius:9px;padding:1px 6px;display:none;box-shadow:0 0 10px var(--r)}
+/* ---------- slides ---------- */
+#track{display:flex;width:400vw;height:100%;position:relative;z-index:1;transition:transform .85s cubic-bezier(.77,0,.18,1)}
+.slide{width:100vw;height:100%;padding:84px 5vw 124px;box-sizing:border-box;display:flex;flex-direction:column;opacity:.2;filter:blur(3px);transform:scale(.93);transition:all .85s cubic-bezier(.77,0,.18,1)}
+.slide.active{opacity:1;filter:none;transform:none}
+/* slide 1 : patient hologram */
+.stage{position:relative;height:min(50vh,440px);aspect-ratio:1/2;flex:none}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 0 8px var(--c))}
+.sp1{animation:spin 26s linear infinite;transform-origin:50% 50%}.sp2{animation:spin 18s linear infinite reverse;transform-origin:50% 50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tag{padding:12px 18px;min-width:170px}.tag small{display:block;color:#6fb4bf;font-size:13px;letter-spacing:.16em}.tag b{font:700 20px Orbitron;color:#fff;text-shadow:0 0 12px var(--c)}
+.badge{padding:9px 22px;border-radius:99px;border:1px solid var(--g);color:var(--g);font:700 13px Orbitron;letter-spacing:.2em;box-shadow:0 0 24px rgba(0,255,136,.45),inset 0 0 14px rgba(0,255,136,.2);animation:pulse 2s infinite;display:inline-flex;gap:10px;align-items:center}
+.badge.off{border-color:var(--r);color:var(--r);box-shadow:0 0 24px rgba(255,0,60,.5),inset 0 0 14px rgba(255,0,60,.2)}
+@keyframes pulse{50%{filter:brightness(1.5)}}
+/* slide 2 : vitals */
+.vp{width:clamp(150px,22vw,31vh);aspect-ratio:1;padding:16px;display:flex;flex-direction:column;justify-content:space-between;text-align:center}
+.vp .n{font:900 clamp(34px,4.6vw,60px) Orbitron;color:var(--c);text-shadow:0 0 22px var(--c);line-height:1}
+.vp.bad{border-color:var(--r);animation:flash .8s infinite}.vp.bad .n{color:#ff6b8a;text-shadow:0 0 24px var(--r)}.vp.bad .st{color:var(--r)}
+@keyframes flash{50%{border-color:rgba(255,0,60,.15);box-shadow:0 0 52px var(--r),inset 0 0 36px rgba(255,0,60,.4)}}
+.st{font:700 12px Orbitron;letter-spacing:.18em;color:var(--g)}
+/* slide 3 : AI core */
+#gArc{transition:stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1),stroke .5s}
+.core{position:relative;width:min(34vh,270px);aspect-ratio:1;display:grid;place-items:center}
+.core .ball{position:absolute;inset:26%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,var(--a) 24%,rgba(0,0,0,.8) 62%,transparent 74%);box-shadow:0 0 60px var(--a),0 0 120px rgba(0,255,136,.3);animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{50%{transform:scale(1.12);filter:brightness(1.3)}}
+.core .cr{position:absolute;inset:6%;border-radius:50%;border:2px solid var(--a);box-shadow:0 0 18px var(--a),inset 0 0 18px var(--a);animation:r3 7s linear infinite}
+.core .cr.b{inset:0;border-color:var(--g);box-shadow:0 0 18px var(--g),inset 0 0 18px var(--g);animation-duration:11s;animation-direction:reverse}
+@keyframes r3{from{transform:rotateX(70deg) rotateZ(0)}to{transform:rotateX(70deg) rotateZ(360deg)}}
+.core .cr.b{animation-name:r4}@keyframes r4{from{transform:rotateY(70deg) rotateZ(0)}to{transform:rotateY(70deg) rotateZ(-360deg)}}
+.core svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.bolt polyline{stroke:#fff;filter:drop-shadow(0 0 6px var(--a)) drop-shadow(0 0 12px var(--g));opacity:0;animation:zap 1.7s infinite}
+.bolt polyline:nth-child(2){animation-delay:.4s}.bolt polyline:nth-child(3){animation-delay:.9s}.bolt polyline:nth-child(4){animation-delay:1.3s}
+@keyframes zap{0%,100%{opacity:0}6%{opacity:1}12%{opacity:.1}18%{opacity:1}30%{opacity:0}}
+.term{padding:0;display:flex;flex-direction:column;min-height:0}.term .bar{padding:9px 14px;border-bottom:1px solid rgba(0,255,136,.25);display:flex;gap:7px;align-items:center;font:12px Orbitron;color:#6fb4bf}
+.term .bar i{width:9px;height:9px;border-radius:50%;background:var(--c)}.term .bar i:nth-child(2){background:var(--g)}.term .bar i:nth-child(3){background:var(--r)}
+#termBody{padding:14px 16px;font:16px/1.7 'Share Tech Mono',monospace;color:var(--c);overflow:auto;flex:1}
+.tl.warn{color:#ffd166}.tl.crit{color:var(--r);text-shadow:0 0 10px var(--r)}.tl.ok{color:var(--g)}
+.tl:last-child::after{content:"█";margin-left:3px;animation:blink 1s steps(2) infinite}
+/* slide 4 : chat */
+#msgs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:18px;scrollbar-width:thin;scrollbar-color:#16323a transparent}
+.msg{flex:0 0 auto;max-width:min(78%,640px);padding:12px 16px;border-radius:12px;line-height:1.45;animation:pop .45s;position:relative;overflow:hidden;white-space:pre-wrap}
+.msg.ai{align-self:flex-start;border:1px solid rgba(0,255,136,.45);border-left:4px solid var(--c);background:linear-gradient(90deg,rgba(0,255,136,.16),rgba(0,255,136,.03));box-shadow:0 0 20px rgba(0,255,136,.2)}
+.msg.ai::after{content:"";position:absolute;top:0;bottom:0;width:60px;left:-60px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);animation:stream 3.2s linear infinite}
+@keyframes stream{to{left:110%}}
+.msg.me{align-self:flex-end;border:1px solid rgba(255,0,60,.6);border-right:4px solid var(--r);background:linear-gradient(270deg,rgba(255,0,60,.22),rgba(255,0,60,.04));box-shadow:0 0 20px rgba(255,0,60,.28)}
+@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.97)}}
+.typing{display:flex;gap:5px;align-items:flex-end;height:20px}.typing i{width:5px;background:var(--c);box-shadow:0 0 8px var(--c);animation:eq .9s infinite ease-in-out}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}.typing i:nth-child(4){animation-delay:.45s}
+@keyframes eq{0%,100%{height:5px}50%{height:20px}}
+#chatIn{flex:1;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.4);border-radius:10px;padding:12px 16px;color:#fff;font:500 17px Rajdhani;outline:none;min-width:0}
+#chatIn:focus{box-shadow:0 0 20px rgba(0,255,136,.45)}
+.rb{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid var(--c);background:rgba(0,255,136,.08);color:var(--c);transition:.25s;flex:none}
+.rb:hover{box-shadow:0 0 22px var(--c)}.rb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+.rb.rec{border-color:var(--r);color:var(--r);animation:flash 1s infinite}
+.chip{border:1px solid rgba(0,255,136,.55);color:#a8ffcc;border-radius:99px;padding:5px 14px;font-size:14px;cursor:pointer;background:rgba(0,255,136,.08);transition:.25s}.chip:hover{box-shadow:0 0 16px var(--g)}
+/* alert drawer */
+#tray{position:fixed;top:76px;bottom:44px;right:14px;width:min(420px,92vw);z-index:40;transform:translateX(115%);transition:transform .5s cubic-bezier(.77,0,.18,1);display:flex;flex-direction:column;padding:14px;border-color:rgba(255,0,60,.55);box-shadow:0 0 34px rgba(255,0,60,.25)}
+#tray.open{transform:none}#alist{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.al{flex:0 0 auto;padding:14px;border:1px solid rgba(255,0,60,.5);border-radius:12px;background:rgba(255,0,60,.06);animation:pop .5s}.al.acked{border-color:rgba(0,255,136,.55);background:rgba(0,255,136,.05);opacity:.8}
+.adv{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--c);background:rgba(0,255,136,.08);box-shadow:0 0 16px rgba(0,255,136,.3);white-space:pre-line;color:#cffcff}
+.ackb{margin-top:10px;width:100%;padding:12px;border-radius:10px;border:0;cursor:pointer;font:700 13px Orbitron;letter-spacing:.14em;color:#fff;background:linear-gradient(135deg,var(--r),#ff7a00);box-shadow:0 0 24px rgba(255,0,60,.55);transition:.25s}.ackb:hover{transform:translateY(-2px);box-shadow:0 0 38px var(--r)}
+.done{margin-top:10px;display:flex;gap:10px;align-items:center;color:var(--g);font:700 13px Orbitron}.chk{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(0,255,136,.15);animation:burst .8s cubic-bezier(.2,1.6,.4,1)}
+@keyframes burst{from{transform:scale(0);box-shadow:0 0 0 0 rgba(0,255,136,.9)}to{transform:scale(1);box-shadow:0 0 0 36px rgba(0,255,136,0)}}
+/* reconnect */
+#lost{position:fixed;inset:0;z-index:100;display:none;place-items:center;background:rgba(20,0,6,.88);backdrop-filter:blur(8px);text-align:center}#lost.show{display:grid}
+#lost h2{font:900 clamp(22px,4vw,44px) Orbitron;color:var(--r);text-shadow:0 0 30px var(--r);animation:flash2 .9s infinite}@keyframes flash2{50%{opacity:.25}}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.55}
+/* body hologram */
+.bo{stroke:var(--a);transition:stroke .5s}.glowS{filter:drop-shadow(0 0 6px var(--a))}
+.bscan{position:absolute;left:-10%;right:-10%;height:3px;top:2%;z-index:2;background:linear-gradient(90deg,transparent,#c9fdff,transparent);box-shadow:0 0 18px 4px var(--c),0 -34px 44px 8px rgba(0,255,136,.2);animation:bscan 3.6s ease-in-out infinite alternate}
+@keyframes bscan{to{top:97%}}
+.heart{fill:rgba(0,255,136,.35);stroke:#00ff88;stroke-width:1.2;transform-box:fill-box;transform-origin:center;animation:hb 1s infinite}
+.hring{fill:none;stroke:#00ff88;stroke-width:1;transform-box:fill-box;transform-origin:center;animation:hring 1s infinite}
+body.danger .heart{fill:rgba(255,0,60,.8);stroke:#ff003c;filter:drop-shadow(0 0 8px #ff003c)}body.danger .hring{stroke:#ff003c}
+@keyframes hb{0%,100%{transform:scale(1)}14%{transform:scale(1.32)}28%{transform:scale(1)}42%{transform:scale(1.18)}}
+@keyframes hring{0%{transform:scale(.8);opacity:.9}100%{transform:scale(3.2);opacity:0}}
+/* ECG monitor */
+.ecgbox{background-image:linear-gradient(rgba(0,255,136,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.13) 1px,transparent 1px),linear-gradient(rgba(0,255,136,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.05) 1px,transparent 1px);background-size:100px 100px,100px 100px,20px 20px,20px 20px;border-radius:8px}
+#ecg{position:absolute;inset:0;width:100%;height:100%}
+/* 3D tilt panels */
+.vp{transition:transform .15s ease-out,border-color .4s,box-shadow .4s;will-change:transform;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(0,255,136,.22),transparent 55%),linear-gradient(135deg,rgba(0,255,136,.07),rgba(0,0,0,.5))}
+/* gauge core */
+.pcore{transform-origin:150px 150px;animation:pcore 1.8s ease-in-out infinite}body.danger .pcore{animation-duration:.7s}
+@keyframes pcore{0%,100%{transform:scale(.82);opacity:.7}50%{transform:scale(1.12);opacity:1}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01s!important}}
+@media(max-width:900px){.slide{padding:84px 4vw 124px;overflow-y:auto}.hide-s{display:none!important}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<!-- TOP BAR -->
+<header id="top" class="holo">
+  <div class="flex items-center gap-3">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="1.6" style="filter:drop-shadow(0 0 6px #00ff88)"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 8v8M8 12h8" stroke="#00ff88"/></svg>
+    <span class="orb font-black tracking-widest" style="text-shadow:0 0 12px var(--c)">WARD ZERO</span>
+  </div>
+  <div class="hide-s hidden md:flex items-center gap-6 text-[15px]">
+    <span><span class="text-green-700" data-i18n="patient">PATIENT</span> <b id="hName" class="orb text-[13px]"></b></span>
+    <span><span class="text-green-700" data-i18n="caregiver">CAREGIVER</span> <b id="hCare" class="orb text-[13px]"></b></span>
+  </div>
+  <div class="flex items-center gap-3">
+    <div class="hidden sm:flex items-center gap-3 text-xs mono text-green-200">
+      <span title="WebSocket"><i class="led" id="ledWs"></i> LINK</span><span title="MQTT"><i class="led" id="ledMqtt"></i> MQTT</span><span title="Database"><i class="led" id="ledDb"></i> DB<span id="bufN" class="text-amber-300"></span></span>
+    </div>
+    <button id="bell" aria-label="Alerts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0"/></svg><span id="bellN">0</span></button>
+    <select id="lang" aria-label="Language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="hinglish">Hinglish</option></select>
+  </div>
+</header>
+
+<main id="track">
+  <!-- SLIDE 1 : PATIENT HOLOGRAM -->
+  <section class="slide active items-center justify-center gap-5">
+    <div class="grid md:grid-cols-[1fr_auto_1fr] items-center gap-6 w-full max-w-6xl">
+      <div class="flex md:flex-col gap-4 md:items-end justify-center order-2 md:order-1">
+        <div class="holo tag float"><small data-i18n="subject">SUBJECT</small><b id="pName"></b></div>
+        <div class="holo tag float d2"><small data-i18n="age">AGE</small><b id="pAge"></b></div>
+      </div>
+      <div class="stage mx-auto order-1 md:order-2">
+        <svg viewBox="0 0 200 400" fill="none" stroke-linejoin="round" aria-label="Patient body hologram">
+          <defs><linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00ff88" stop-opacity=".24"/><stop offset="1" stop-color="#00ff88" stop-opacity=".1"/></linearGradient>
+            <clipPath id="bodyClip"><path d="M90 74 C70 78 52 84 46 100 L34 170 L28 232 L38 236 L50 180 L58 140 L60 214 L64 292 L68 380 L92 380 L96 296 L100 250 L104 296 L108 380 L132 380 L136 292 L140 214 L142 140 L150 180 L162 236 L172 232 L166 170 L154 100 C148 84 130 78 110 74 Z"/><circle cx="100" cy="38" r="22"/></clipPath>
+            <pattern id="wire" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" stroke="#00ff88" stroke-opacity=".25" stroke-width=".6"/></pattern></defs>
+          <ellipse cx="100" cy="388" rx="74" ry="9" class="bo" opacity=".75"/><ellipse cx="100" cy="388" rx="50" ry="5" stroke="#00ff88" opacity=".8"/>
+          <g class="bo glowS"><circle cx="100" cy="38" r="22" fill="url(#bodyG)" stroke-width="1.6"/><path d="M92 58V74M108 58V74" stroke-width="1.4"/><path d="M90 74 C70 78 52 84 46 100 L34 170 L28 232 L38 236 L50 180 L58 140 L60 214 L64 292 L68 380 L92 380 L96 296 L100 250 L104 296 L108 380 L132 380 L136 292 L140 214 L142 140 L150 180 L162 236 L172 232 L166 170 L154 100 C148 84 130 78 110 74 Z" fill="url(#bodyG)" stroke-width="1.8"/></g>
+          <g clip-path="url(#bodyClip)"><rect width="200" height="400" fill="url(#wire)"/>
+            <g stroke="#00ff88" stroke-opacity=".55" stroke-width=".8" id="ribs"><path d="M64 90Q100 98 136 90"/><path d="M100 66V250" stroke-dasharray="2 4"/><ellipse cx="100" cy="226" rx="34" ry="14"/></g>
+            <g stroke="#00ff88" stroke-width="1.1" stroke-opacity=".9"><path d="M78 96C66 104 64 140 76 152C88 150 94 130 94 104Z"/><path d="M122 96C134 104 136 140 124 152C112 150 106 130 106 104Z"/></g>
+            <circle cx="100" cy="34" r="8" stroke="#00ff88" stroke-opacity=".5" stroke-width=".7"/></g>
+          <path d="M120 120L150 116" stroke="#00ff88" stroke-opacity=".7" stroke-width=".7"/><text id="svgHr" x="151" y="114" font-size="9" fill="#00ff88" font-family="Share Tech Mono">♥ --</text>
+          <circle id="hring" class="hring" cx="112" cy="120" r="9"/><g transform="translate(112 120)"><path id="heart" class="heart" d="M0 9C-15-2-11-15 0-7C11-15 15-2 0 9Z"/></g>
+        </svg>
+        <div class="bscan"></div>
+      </div>
+      <div class="flex md:flex-col gap-4 md:items-start justify-center order-3">
+        <div class="holo tag float d3"><small data-i18n="blood">BLOOD TYPE</small><b id="pBlood"></b></div>
+        <div class="holo tag float"><small data-i18n="caregiver">CAREGIVER</small><b id="pCare"></b></div>
+      </div>
+    </div>
+    <div class="badge off" id="linkBadge"><i class="led" id="ledBadge"></i><span id="linkTxt" data-i18n="linkOff">LINK OFFLINE</span></div>
+    <p class="text-green-200/70 text-center" data-i18n="mission">Turning a bedroom into a smart hospital ward.</p>
+  </section>
+
+  <!-- SLIDE 2 : LIVE VITALS -->
+  <section class="slide gap-5">
+    <div class="flex flex-wrap justify-center gap-5">
+      <div class="holo vp float" id="cHr"><div class="text-green-200/80" data-i18n="hr">Heart rate</div><div><div class="n" id="vHr">--</div><div class="mono text-sm text-green-200/60 mt-1">bpm · 60–100</div></div><div class="st" id="sHr">NOMINAL</div></div>
+      <div class="holo vp float d2" id="cSpo2"><div class="text-green-200/80" data-i18n="spo2">Blood oxygen</div><div><div class="n" id="vSpo2">--</div><div class="mono text-sm text-green-200/60 mt-1">SpO₂ % · ≥ 95</div></div><div class="st" id="sSpo2">NOMINAL</div></div>
+      <div class="holo vp float d3" id="cBp"><div class="text-green-200/80" data-i18n="bp">Blood pressure</div><div><div class="n"><span id="vSys">--</span><span class="opacity-50">/</span><span id="vDia">--</span></div><div class="mono text-sm text-green-200/60 mt-1">mmHg · 90–140</div></div><div class="st" id="sBp">NOMINAL</div></div>
+      <div class="holo vp float" id="cTemp"><div class="text-green-200/80" data-i18n="temp">Temperature</div><div><div class="n" id="vTemp">--</div><div class="mono text-sm text-green-200/60 mt-1">°C · 36–37.8</div></div><div class="st" id="sTemp">NOMINAL</div></div>
+    </div>
+    <div class="holo p-4 flex-1 min-h-[160px] flex flex-col"><div class="orb text-xs text-green-300 tracking-widest mb-2" data-i18n="trend">LIVE ECG TREND</div><div class="flex-1 min-h-0 relative ecgbox" id="ecgBox"><canvas id="ecg"></canvas></div></div>
+  </section>
+
+  <!-- SLIDE 3 : AI RISK -->
+  <section class="slide items-center justify-center gap-6 lg:flex-row lg:gap-8">
+    <div class="relative" style="width:min(42vh,360px);aspect-ratio:1;filter:drop-shadow(0 0 18px var(--a))">
+      <svg viewBox="0 0 300 300" class="w-full h-full"><defs><radialGradient id="coreG"><stop offset="0" style="stop-color:var(--a);stop-opacity:.6"/><stop offset="1" style="stop-color:var(--a);stop-opacity:0"/></radialGradient></defs>
+        <g class="sp1"><circle cx="150" cy="150" r="147" fill="none" stroke="#00ff88" stroke-width="3" stroke-dasharray="70 18 8 18"/></g>
+        <g class="sp2"><circle cx="150" cy="150" r="108" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="2 7"/></g>
+        <circle class="pcore" cx="150" cy="150" r="88" fill="url(#coreG)"/><g id="ticks" stroke="rgba(0,255,136,.45)"></g>
+        <circle cx="150" cy="150" r="118" fill="none" stroke="rgba(0,255,136,.12)" stroke-width="16"/>
+        <circle id="gArc" cx="150" cy="150" r="118" fill="none" stroke="#00ff88" stroke-width="16" stroke-linecap="round" stroke-dasharray="741.4" stroke-dashoffset="741.4" transform="rotate(-90 150 150)"/>
+        <circle cx="150" cy="150" r="96" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="4 8" class="sp1"/></svg>
+      <div class="absolute inset-0 flex flex-col items-center justify-center"><div id="gNum" class="orb font-black" style="font-size:clamp(40px,8vw,72px);color:var(--a);text-shadow:0 0 30px var(--a)">0.00</div><div id="gLvl" class="orb text-xs tracking-[.3em] mt-1" style="color:var(--a)"></div></div>
+    </div>
+    <div class="core float"><div class="cr"></div><div class="cr b"></div><div class="ball"></div>
+      <svg viewBox="0 0 200 200" class="bolt" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="100,100 112,78 104,66 122,38 114,26"/><polyline points="100,100 80,118 90,130 68,152 76,170"/><polyline points="100,100 128,108 140,98 170,116"/><polyline points="100,100 72,84 58,92 30,72"/></svg></div>
+    <div class="holo term w-full lg:max-w-md h-[34vh] lg:h-[46vh]"><div class="bar"><i></i><i></i><i></i><span class="ml-2" data-i18n="reasoning">AI REASONING</span></div><div id="termBody"></div></div>
+  </section>
+
+  <!-- SLIDE 4 : AI CHAT -->
+  <section class="slide gap-3">
+    <div class="holo flex-1 min-h-0 flex flex-col">
+      <div id="msgs"></div>
+      <div class="px-4 pb-2 flex flex-wrap gap-2"><button class="chip" data-q="q1"></button><button class="chip" data-q="q2"></button><button class="chip" data-q="q3"></button></div>
+      <div class="p-4 pt-1 flex gap-3 items-center">
+        <button class="rb" id="mic" aria-label="Voice"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg></button>
+        <input id="chatIn" autocomplete="off" data-i18n-ph="chatPh">
+        <button class="rb" id="send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ALERT DRAWER -->
+<aside id="tray" class="holo">
+  <div class="flex justify-between items-center"><h3 class="orb text-red-400 font-bold tracking-widest" data-i18n="alertsT">ALERTS</h3><button id="trayX" class="text-green-300 text-xl px-2" aria-label="Close">✕</button></div>
+  <div id="alist"></div>
+</aside>
+
+<nav id="bot" class="holo">
+  <button class="nav" id="prev"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span data-i18n="prev">PREV</span></button>
+  <div class="flex gap-2 items-center" id="dots"></div>
+  <button class="nav" id="next"><span data-i18n="next">NEXT</span><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+</nav>
+
+<footer id="foot">
+  <span><span data-i18n="made">Made by</span> <b class="orb">TeamJarvis</b></span>
+  <a href="https://github.com/SalimXcode" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+  <a href="https://www.linkedin.com/in/salimkha" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M0 1.15C0 .52.52 0 1.17 0h13.66C15.48 0 16 .52 16 1.15v13.7c0 .63-.52 1.15-1.17 1.15H1.17C.52 16 0 15.48 0 14.85V1.15zM4.94 13.4V6.2H2.55v7.2h2.39zM3.75 5.2c.83 0 1.35-.55 1.35-1.24-.02-.7-.52-1.24-1.33-1.24-.82 0-1.35.54-1.35 1.24 0 .69.52 1.24 1.32 1.24h.01zM13.4 13.4V9.27c0-2.21-1.18-3.24-2.75-3.24-1.27 0-1.84.7-2.15 1.19V6.2H6.11c.03.68 0 7.2 0 7.2H8.5V9.38c0-.21.02-.43.08-.58.17-.43.56-.88 1.22-.88.86 0 1.2.66 1.2 1.62v3.86h2.4z"/></svg>LinkedIn</a>
+</footer>
+
+<div id="lost"><div><h2 data-i18n="lost">CONNECTION LOST - RECONNECTING</h2><p class="mono text-red-300 mt-3" data-i18n="lostSub">Retrying every 3 seconds. No need to refresh.</p></div></div>
+
+<script>
+/* ============ CONFIG: edit patient details here ============ */
+const PATIENT={name:"John Doe",age:58,blood:"O+",caregiver:"Nurse Sarah"};
+
+/* ============ i18n ============ */
+const I18N={
+en:{patient:"PATIENT",caregiver:"CAREGIVER",subject:"SUBJECT",age:"AGE",years:"yrs",blood:"BLOOD TYPE",linkOn:"BIOMETRIC LINK ACTIVE",linkOff:"LINK OFFLINE",mission:"Turning a bedroom into a smart hospital ward.",
+hr:"Heart rate",spo2:"Blood oxygen",bp:"Blood pressure",temp:"Temperature",nom:"NOMINAL",crit:"CRITICAL",trend:"LIVE ECG TREND",
+lvlLow:"STABLE",lvlMed:"ELEVATED",lvlHigh:"CRITICAL",stable:"All vitals within safe range.",waiting:"Waiting for sensor data...",reasoning:"AI REASONING",
+tScan:"Scanning vitals...",tRisk:"Risk level: {v}",tAlert:"Alert dispatched to caregiver.",
+chatPh:"Ask the AI about the patient...",chatHello:"Ward Zero AI online. Ask me about the patient's vitals or what to do next.",chatOffline:"Link offline. I will answer once the connection returns.",q1:"How is the patient?",q2:"Why is the risk high?",q3:"What should I do now?",
+alertsT:"ALERTS",noAlerts:"No alerts. The patient is stable.",ack:"ACKNOWLEDGE ALERT",acked:"Acknowledged. Help is on the way.",advice:"AI ADVICE FOR CAREGIVER",risk:"RISK",prev:"PREV",next:"NEXT",
+lost:"CONNECTION LOST - RECONNECTING",lostSub:"Retrying every 3 seconds. No need to refresh.",made:"Made by",
+tachy:"Tachycardia detected: heart rate {v} bpm",brady:"Bradycardia detected: heart rate {v} bpm",spo2_low:"SpO₂ dropping: {v}%",spo2_crit:"Critically low SpO₂: {v}%",bp_high:"High blood pressure: {v}",bp_low:"Low blood pressure: {v}",fever:"Fever detected: {v} °C",hypo:"Low body temperature: {v} °C"},
+hi:{patient:"मरीज़",caregiver:"देखभालकर्ता",subject:"विषय",age:"आयु",years:"वर्ष",blood:"रक्त समूह",linkOn:"बायोमेट्रिक लिंक सक्रिय",linkOff:"लिंक बंद",mission:"एक बेडरूम को स्मार्ट अस्पताल वार्ड में बदलना।",
+hr:"हृदय गति",spo2:"रक्त ऑक्सीजन",bp:"रक्तचाप",temp:"तापमान",nom:"सामान्य",crit:"गंभीर",trend:"लाइव ईसीजी ट्रेंड",
+lvlLow:"स्थिर",lvlMed:"बढ़ा हुआ",lvlHigh:"गंभीर",stable:"सभी वाइटल्स सुरक्षित सीमा में हैं।",waiting:"सेंसर डेटा की प्रतीक्षा...",reasoning:"एआई का कारण",
+tScan:"वाइटल्स स्कैन हो रहे हैं...",tRisk:"जोखिम स्तर: {v}",tAlert:"देखभालकर्ता को अलर्ट भेजा गया।",
+chatPh:"मरीज़ के बारे में एआई से पूछें...",chatHello:"वार्ड ज़ीरो एआई चालू है। मरीज़ के वाइटल्स या आगे क्या करें, पूछिए।",chatOffline:"लिंक बंद है। कनेक्शन लौटते ही जवाब दूँगा।",q1:"मरीज़ कैसा है?",q2:"जोखिम ज़्यादा क्यों है?",q3:"अब क्या करूँ?",
+alertsT:"अलर्ट",noAlerts:"कोई अलर्ट नहीं। मरीज़ स्थिर है।",ack:"अलर्ट स्वीकार करें",acked:"स्वीकार किया गया। मदद आ रही है।",advice:"देखभालकर्ता के लिए एआई सलाह",risk:"जोखिम",prev:"पिछला",next:"अगला",
+lost:"कनेक्शन टूटा - पुनः कनेक्ट हो रहा है",lostSub:"हर 3 सेकंड में प्रयास। पेज रीफ्रेश न करें।",made:"बनाया गया:",
+tachy:"तेज़ धड़कन पाई गई: {v} bpm",brady:"धीमी धड़कन पाई गई: {v} bpm",spo2_low:"SpO₂ गिर रहा है: {v}%",spo2_crit:"SpO₂ बेहद कम: {v}%",bp_high:"उच्च रक्तचाप: {v}",bp_low:"निम्न रक्तचाप: {v}",fever:"बुखार पाया गया: {v} °C",hypo:"शरीर का तापमान कम: {v} °C"},
+hinglish:{patient:"PATIENT",caregiver:"CAREGIVER",subject:"SUBJECT",age:"UMAR",years:"saal",blood:"BLOOD GROUP",linkOn:"BIOMETRIC LINK ACTIVE",linkOff:"LINK OFFLINE",mission:"Ek bedroom ko smart hospital ward banana.",
+hr:"Heart rate",spo2:"Blood oxygen",bp:"Blood pressure",temp:"Temperature",nom:"NORMAL",crit:"CRITICAL",trend:"LIVE ECG TREND",
+lvlLow:"STABLE",lvlMed:"BADHA HUA",lvlHigh:"CRITICAL",stable:"Saare vitals safe range mein hain.",waiting:"Sensor data ka wait hai...",reasoning:"AI REASONING",
+tScan:"Vitals scan ho rahe hain...",tRisk:"Risk level: {v}",tAlert:"Caregiver ko alert bhej diya gaya.",
+chatPh:"Patient ke baare mein AI se pucho...",chatHello:"Ward Zero AI online hai. Patient ke vitals ya agla step pucho.",chatOffline:"Link offline hai. Connection aate hi jawab dunga.",q1:"Patient kaisa hai?",q2:"Risk high kyun hai?",q3:"Ab kya karun?",
+alertsT:"ALERTS",noAlerts:"Koi alert nahi. Patient stable hai.",ack:"ALERT ACKNOWLEDGE KARO",acked:"Acknowledge ho gaya. Madad aa rahi hai.",advice:"CAREGIVER KE LIYE AI ADVICE",risk:"RISK",prev:"PEECHE",next:"AAGE",
+lost:"CONNECTION LOST - RECONNECTING",lostSub:"Har 3 second mein try. Page refresh mat karo.",made:"Banaya:",
+tachy:"Tachycardia mila: heart rate {v} bpm",brady:"Bradycardia mila: heart rate {v} bpm",spo2_low:"SpO₂ gir raha hai: {v}%",spo2_crit:"SpO₂ bahut kam: {v}%",bp_high:"High blood pressure: {v}",bp_low:"Low blood pressure: {v}",fever:"Bukhar mila: {v} °C",hypo:"Body temperature kam: {v} °C"}};
+let lang="en";try{lang=localStorage.getItem("wz_lang")||"en"}catch{}
+const t=(k,v)=>(I18N[lang][k]??I18N.en[k]??k).replace("{v}",v??"");
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function applyLang(){
+  document.documentElement.lang=lang==="hi"?"hi":"en";
+  document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent=t(e.dataset.i18n));
+  document.querySelectorAll("[data-i18n-ph]").forEach(e=>e.placeholder=t(e.dataset.i18nPh));
+  document.querySelectorAll("[data-q]").forEach(e=>e.textContent=t(e.dataset.q));
+  $("pAge").textContent=`${PATIENT.age} ${t("years")}`;
+  paintStatus();renderGauge();renderFeed();if(state.hasData)renderVitals(state.v);refreshTerm(true);
+}
+
+/* ============ slide engine ============ */
+const slides=[...document.querySelectorAll(".slide")];let cur=0;
+slides.forEach((_,i)=>{const d=document.createElement("div");d.className="dot";d.onclick=()=>go(i);$("dots").appendChild(d)});
+function go(n){cur=Math.max(0,Math.min(slides.length-1,n));
+  $("track").style.transform=`translateX(-${cur*100}vw)`;
+  slides.forEach((s,i)=>s.classList.toggle("active",i===cur));
+  document.querySelectorAll(".dot").forEach((d,i)=>d.classList.toggle("on",i===cur));
+  $("prev").disabled=cur===0;$("next").disabled=cur===slides.length-1;
+  if(cur===1)setTimeout(ecgResize,880);
+  if(cur===2)refreshTerm(true);
+  if(cur===3)setTimeout(()=>{const m=$("msgs");m.scrollTop=m.scrollHeight},880);}
+$("prev").onclick=()=>go(cur-1);$("next").onclick=()=>go(cur+1);
+addEventListener("keydown",e=>{if(["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;
+  if(e.key==="ArrowRight"||e.key==="PageDown")go(cur+1);if(e.key==="ArrowLeft"||e.key==="PageUp")go(cur-1);
+  if(["1","2","3","4"].includes(e.key))go(+e.key-1);if(e.key==="Escape")tray(false)});
+let tx=0;addEventListener("touchstart",e=>tx=e.touches[0].clientX,{passive:true});
+addEventListener("touchend",e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>80&&!e.target.closest("#msgs,#alist,#termBody"))go(cur+(d<0?1:-1))},{passive:true});
+
+/* ============ count-up tween ============ */
+function tween(el,to,dec=0){const from=parseFloat(el.dataset.v??0);el.dataset.v=to;const t0=performance.now();cancelAnimationFrame(el._r);
+  const f=n=>{const k=Math.min(1,(n-t0)/700),e=1-Math.pow(1-k,3);el.textContent=(from+(to-from)*e).toFixed(dec);if(k<1)el._r=requestAnimationFrame(f)};el._r=requestAnimationFrame(f)}
+
+/* ============ custom canvas ECG (P-QRS-T), 60fps, speed follows BPM ============ */
+const ecgC=$("ecg"),ex=ecgC.getContext("2d"),SPEED=210;let EW=0,EH=0,trace=[],ePh=0,eHr=0,eAcc=0,eLast=0;
+function ecgResize(){const b=$("ecgBox"),d=Math.min(devicePixelRatio||1,2);EW=b.clientWidth;EH=b.clientHeight;if(!EW||!EH)return;
+  ecgC.width=EW*d;ecgC.height=EH*d;ex.setTransform(d,0,0,d,0,0);if(trace.length>EW)trace=trace.slice(-EW);while(trace.length<EW)trace.unshift(0)}
+new ResizeObserver(ecgResize).observe($("ecgBox"));
+const G=(p,c,w,a)=>a*Math.exp(-.5*((p-c)/w)**2);
+const wave=p=>G(p,.12,.03,.14)+G(p,.205,.008,-.14)+G(p,.225,.011,1)+G(p,.25,.011,-.28)+G(p,.43,.055,.3); /* P, Q, R, S, T */
+function ecgFrame(now){requestAnimationFrame(ecgFrame);
+  if(cur!==1||!EW||document.hidden){eLast=0;return}
+  const dt=eLast?Math.min(.05,(now-eLast)/1000):0;eLast=now;
+  eHr+=((state.hasData?state.v.hr:0)-eHr)*Math.min(1,dt*3);
+  eAcc+=SPEED*dt;let n=Math.floor(eAcc);eAcc-=n;
+  while(n-->0){let y=0;if(eHr>20){ePh+=(1/SPEED)/(60/eHr);if(ePh>=1)ePh-=1;y=wave(ePh)}trace.push(y+(Math.random()-.5)*.012);trace.shift()}
+  const bad=state.hasData&&(state.v.hr>100||state.v.hr<55),col=bad?"#ff003c":"#00ff88",mid=EH*.68,amp=EH*.5;
+  ex.clearRect(0,0,EW,EH);const g=ex.createLinearGradient(0,0,EW,0);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(.3,col);g.addColorStop(1,col);
+  ex.lineWidth=2.4;ex.lineJoin="round";ex.strokeStyle=g;ex.shadowColor=col;ex.shadowBlur=14;ex.beginPath();
+  for(let i=0;i<EW;i++){const y=mid-trace[i]*amp;i?ex.lineTo(i,y):ex.moveTo(i,y)}ex.stroke();
+  ex.fillStyle="#fff";ex.shadowBlur=24;ex.beginPath();ex.arc(EW-2,mid-trace[EW-1]*amp,3.5,0,7);ex.fill();
+  ex.shadowBlur=0;ex.fillStyle=col;ex.font="700 12px Orbitron";ex.fillText("LEAD II",14,24);ex.font="900 24px Orbitron";ex.fillText((state.hasData?Math.round(eHr):"--")+" BPM",14,54)}
+
+/* ============ state + rendering ============ */
+const state={risk:0,reasons:[],alerts:[],hasData:false,v:null};
+const lvl=r=>r>.6?"High":r>.3?"Med":"Low";
+function setPanel(id,sid,bad){$(id).classList.toggle("bad",bad);$(sid).textContent=t(bad?"crit":"nom")}
+function renderVitals(v){
+  tween($("vHr"),v.hr);tween($("vSpo2"),v.spo2,1);tween($("vSys"),v.sys);tween($("vDia"),v.dia);tween($("vTemp"),v.temp,1);
+  setPanel("cHr","sHr",v.hr>100||v.hr<55);setPanel("cSpo2","sSpo2",v.spo2<95);setPanel("cBp","sBp",v.sys>140||v.sys<95);setPanel("cTemp","sTemp",v.temp>37.8||v.temp<36)}
+const CIRC=741.4;
+function renderGauge(){const r=state.risk,col=r>.6?"#ff003c":r>.3?"#ffb020":"#00ff88";
+  $("gArc").style.strokeDashoffset=CIRC*(1-r);$("gArc").setAttribute("stroke",col);tween($("gNum"),r,2);
+  $("gLvl").textContent=t("lvl"+lvl(r));document.body.classList.toggle("danger",r>.6)}
+function renderFeed(){
+  const open=state.alerts.filter(a=>!a.acknowledged).length,n=$("bellN");
+  n.textContent=open;n.style.display=open?"block":"none";$("bell").classList.toggle("hot",open>0);
+  $("alist").innerHTML=state.alerts.length?state.alerts.map(a=>`<div class="al ${a.acknowledged?"acked":""}">
+    <div class="flex justify-between"><b class="orb text-red-400">${t("risk")} ${(+a.risk).toFixed(2)}</b><span class="mono text-xs text-green-200/60">${esc(a.patient_id)} · ${new Date(a.ts).toLocaleTimeString()}</span></div>
+    <div class="flex flex-wrap gap-2 mt-2">${(a.reasons||[]).map(r=>`<span class="text-sm px-2 py-0.5 rounded-full" style="background:rgba(255,0,60,.16)">${t(r.code,r.value)}</span>`).join("")}</div>
+    <div class="adv"><div class="orb text-[10px] tracking-widest text-green-300 mb-1">${t("advice")}</div>${esc(a.advice||"")}</div>
+    ${a.acknowledged?`<div class="done"><div class="chk"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></div>${t("acked")}</div>`:`<button class="ackb" onclick="ack('${a.id}')">${t("ack")}</button>`}</div>`).join(""):`<div class="text-center text-green-200/60 p-8">${t("noAlerts")}</div>`}
+function ack(id){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"ack",id}));const a=state.alerts.find(x=>x.id===id);if(a){a.acknowledged=true;renderFeed()}}
+const tray=o=>$("tray").classList.toggle("open",o);$("bell").onclick=()=>tray(!$("tray").classList.contains("open"));$("trayX").onclick=()=>tray(false);
+
+/* ============ AI terminal (typewriter) ============ */
+let typeTok=0,termSig="";
+function termLines(){const L=[{text:"> "+t("tScan")}];
+  if(!state.hasData){L.push({text:"> "+t("waiting")});return L}
+  state.reasons.forEach(r=>L.push({text:"> "+t(r.code,r.value),cls:state.risk>.6?"crit":"warn"}));
+  if(!state.reasons.length)L.push({text:"> "+t("stable"),cls:"ok"});
+  L.push({text:"> "+t("tRisk",t("lvl"+lvl(state.risk))),cls:state.risk>.6?"crit":state.risk>.3?"warn":"ok"});
+  if(state.risk>.6)L.push({text:"> "+t("tAlert"),cls:"crit"});return L}
+async function typeLines(L){const tok=++typeTok,box=$("termBody");box.innerHTML="";
+  for(const l of L){const d=document.createElement("div");d.className="tl "+(l.cls||"");box.appendChild(d);
+    for(let i=1;i<=l.text.length;i++){if(tok!==typeTok)return;d.textContent=l.text.slice(0,i);await sleep(16)}
+    box.scrollTop=box.scrollHeight;await sleep(260)}}
+function refreshTerm(force){const sig=lvl(state.risk)+state.reasons.map(r=>r.code).join();if(force||sig!==termSig){termSig=sig;typeLines(termLines())}}
+
+/* ============ chat ============ */
+function addMsg(role,text){const d=document.createElement("div");d.className="msg "+role;d.textContent=text;$("msgs").appendChild(d);$("msgs").scrollTop=$("msgs").scrollHeight;return d}
+let typingEl=null,typingTimer;
+function showTyping(){hideTyping();typingEl=addMsg("ai","");typingEl.innerHTML='<div class="typing"><i></i><i></i><i></i><i></i></div>';typingTimer=setTimeout(hideTyping,25000)}
+function hideTyping(){clearTimeout(typingTimer);if(typingEl){typingEl.remove();typingEl=null}}
+function sendChat(q){const txt=(q||$("chatIn").value).trim();if(!txt)return;addMsg("me",txt);$("chatIn").value="";
+  if(ws&&ws.readyState===1){showTyping();ws.send(JSON.stringify({type:"chat",text:txt,lang}))}else addMsg("ai",t("chatOffline"))}
+$("send").onclick=()=>sendChat();$("chatIn").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
+document.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>sendChat(b.textContent));
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
+$("mic").onclick=()=>{const m=$("mic");if(!SR){m.classList.add("rec");setTimeout(()=>m.classList.remove("rec"),1800);return}
+  if(rec){rec.stop();return}rec=new SR();rec.lang=lang==="hi"?"hi-IN":"en-IN";m.classList.add("rec");
+  rec.onresult=e=>sendChat(e.results[0][0].transcript);rec.onend=rec.onerror=()=>{m.classList.remove("rec");rec=null};try{rec.start()}catch{m.classList.remove("rec");rec=null}};
+
+/* ============ status ============ */
+let wsOk=false,st={mqtt:false,db:false,buffer:0};
+function paintStatus(){const live=wsOk&&st.mqtt;
+  $("ledWs").classList.toggle("ok",wsOk);$("ledMqtt").classList.toggle("ok",st.mqtt);$("ledDb").classList.toggle("ok",st.db);
+  $("bufN").textContent=st.buffer?` (${st.buffer})`:"";
+  $("linkBadge").classList.toggle("off",!live);$("ledBadge").classList.toggle("ok",live);$("linkTxt").textContent=t(live?"linkOn":"linkOff")}
+
+/* ============ WebSocket + auto-reconnect (every 3 s) ============ */
+let ws=null,retry=null;
+const WS_URL=location.protocol==="file:"?"ws://localhost:8000/ws":`${location.protocol==="https:"?"wss":"ws"}://${location.host}/ws`;
+function onVitals(rec,reasons){state.hasData=true;state.v=rec;state.risk=rec.risk;state.reasons=reasons||[];
+  renderVitals(rec);setHeart(rec.hr);renderGauge();refreshTerm(false)}
+function connect(){clearTimeout(retry);
+  try{ws=new WebSocket(WS_URL)}catch{return schedule()}
+  ws.onopen=()=>{wsOk=true;$("lost").classList.remove("show");paintStatus()};
+  ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch{return}
+    if(m.type==="snapshot"){
+      if(m.history.length){const h=m.history[m.history.length-1];onVitals(h,h.reasons)}state.alerts=m.alerts;renderFeed()}
+    else if(m.type==="vitals")onVitals(m.data,m.reasons);
+    else if(m.type==="alert"){state.alerts.unshift(m.data);renderFeed();tray(true)}
+    else if(m.type==="ack"){const a=state.alerts.find(x=>x.id===m.id);if(a&&!a.acknowledged){a.acknowledged=true;renderFeed()}}
+    else if(m.type==="chat"){hideTyping();addMsg("ai",m.text)}
+    else if(m.type==="status"){st=m;paintStatus()}};
+  ws.onclose=()=>{wsOk=false;st.mqtt=false;paintStatus();hideTyping();$("lost").classList.add("show");schedule()};
+  ws.onerror=()=>{try{ws.close()}catch{}}}
+function schedule(){clearTimeout(retry);retry=setTimeout(connect,3000)}
+setInterval(()=>{if(ws&&ws.readyState===1)ws.send('{"type":"ping"}')},20000);
+
+/* ============ boot ============ */
+$("hName").textContent=$("pName").textContent=PATIENT.name;$("hCare").textContent=$("pCare").textContent=PATIENT.caregiver;$("pBlood").textContent=PATIENT.blood;
+const tk=$("ticks");for(let i=0;i<60;i++){const a=i*6*Math.PI/180,l=i%5?4:9;tk.innerHTML+=`<line x1="${150+136*Math.sin(a)}" y1="${150-136*Math.cos(a)}" x2="${150+(136+l)*Math.sin(a)}" y2="${150-(136+l)*Math.cos(a)}"/>`}
+$("lang").value=lang;$("lang").onchange=e=>{lang=e.target.value;try{localStorage.setItem("wz_lang",lang)}catch{};applyLang()};
+/* ---- body hologram helpers ---- */
+function setHeart(hr){const d=(60/Math.max(40,hr))+"s";$("heart").style.animationDuration=d;$("hring").style.animationDuration=d;$("svgHr").textContent="♥ "+Math.round(hr)}
+{let r="";for(let y=94;y<=150;y+=11)r+=`<path d="M64 ${y}Q100 ${y+14} 136 ${y}"/>`;$("ribs").insertAdjacentHTML("beforeend",r)}
+/* ---- 3D tilt on vitals panels ---- */
+document.querySelectorAll(".vp").forEach(p=>{
+  p.addEventListener("pointermove",e=>{if(e.pointerType==="touch")return;const r=p.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+    p.style.transform=`perspective(700px) rotateX(${(.5-y)*20}deg) rotateY(${(x-.5)*20}deg) scale(1.05)`;p.style.setProperty("--mx",x*100+"%");p.style.setProperty("--my",y*100+"%")});
+  p.addEventListener("pointerleave",()=>{p.style.transform="";p.style.removeProperty("--mx");p.style.removeProperty("--my")})});
+/* ---- Three.js background: data globe + DNA helix + dust (30fps, subtle) ---- */
+(function(){
+  if(!window.THREE||matchMedia("(prefers-reduced-motion:reduce)").matches){$("bg").style.display="none";return}
+  let R;try{R=new THREE.WebGLRenderer({canvas:$("bg"),alpha:true,antialias:false})}catch{$("bg").style.display="none";return}
+  const S=new THREE.Scene(),C=new THREE.PerspectiveCamera(55,1,.1,200);C.position.z=46;
+  const mk=(pos,color,size,op)=>{const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+    return new THREE.Points(g,new THREE.PointsMaterial({color,size,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}))};
+  const gp=[],N=650;for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),a=i*2.39996;gp.push(Math.cos(a)*r*15,y*15,Math.sin(a)*r*15)}
+  const globe=mk(gp,0x00ff88,.32,.8),ring=new THREE.Mesh(new THREE.TorusGeometry(19,.05,6,100),new THREE.MeshBasicMaterial({color:0x00ff88,transparent:true,opacity:.5}));ring.rotation.x=1.2;globe.add(ring);
+  const dp=[],lp=[];for(let i=0;i<90;i++){const y=(i-45)*.75,a=i*.32,ax=Math.cos(a)*4,az=Math.sin(a)*4;dp.push(ax,y,az,-ax,y,-az);if(i%3===0)lp.push(ax,y,az,-ax,y,-az)}
+  const dna=mk(dp,0x00ff88,.45,.9),lg=new THREE.BufferGeometry();lg.setAttribute("position",new THREE.Float32BufferAttribute(lp,3));
+  dna.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0x00ff88,transparent:true,opacity:.28})));
+  const du=[];for(let i=0;i<260;i++)du.push((Math.random()-.5)*110,(Math.random()-.5)*70,(Math.random()-.5)*60);
+  const dust=mk(du,0x66ffcc,.22,.55),root=new THREE.Group();root.add(globe,dna,dust);S.add(root);
+  function rs(){const w=innerWidth,h=innerHeight,k=Math.min(1,w/h/1.6);R.setSize(w,h,false);C.aspect=w/h;C.updateProjectionMatrix();globe.position.set(-26*k,0,0);dna.position.set(30*k,0,-4);root.scale.setScalar(Math.max(.6,k))}
+  rs();addEventListener("resize",rs);
+  let mx=0,my=0,last=0;addEventListener("pointermove",e=>{mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5},{passive:true});
+  const red=new THREE.Color(0xff003c),cy=new THREE.Color(0x00ff88);
+  (function loop(now){requestAnimationFrame(loop);if(document.hidden||now-last<33)return;last=now;
+    globe.rotation.y+=.004;globe.rotation.x=.25;dna.rotation.y+=.008;dna.rotation.z=.25;dust.rotation.y+=.0008;
+    C.position.x+=(mx*5-C.position.x)*.03;C.position.y+=(-my*3-C.position.y)*.03;C.lookAt(0,0,0);
+    globe.material.color.lerp(document.body.classList.contains("danger")?red:cy,.04);R.render(S,C)})(0)})();
+applyLang();addMsg("ai",t("chatHello"));go(0);connect();requestAnimationFrame(ecgFrame);
+</script>
+</body>
+</html>
